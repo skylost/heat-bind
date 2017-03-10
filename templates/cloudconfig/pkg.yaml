@@ -1,0 +1,18 @@
+heat_template_version: 2016-04-08
+
+description: Cloudconfig to deploy packages
+
+resources:
+  cloudconfig_pkg:
+    type: OS::Heat::CloudConfig
+    properties:
+      cloud_config:
+        packages:
+          - libpython2.7
+          - git-core
+          - curl
+
+outputs:
+  OS::stack_id:
+    description: The ID of the cloudconfig_pkg resource.
+    value: {get_resource: cloudconfig_pkg}

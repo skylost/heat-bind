@@ -1,0 +1,48 @@
+heat_template_version: 2016-04-08
+
+description: SoftwareConfig to deploy monasca
+
+parameters:
+  barbican_uri_bind_tsig:
+    type: string
+    description: Barbican URI bind tsig
+    hidden: true
+  barbican_uri_token_id:
+    type: string
+    description: Barbican URI token id
+    hidden: true
+  bind_allow_notify:
+    type: string
+    description: Hosts allow notify
+
+resources:
+  role_bind:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: bind
+      config:
+        str_replace:
+          params:
+            $barbican_uri_bind_tsig: {get_param: barbican_uri_bind_tsig}
+            $barbican_uri_token_id: {get_param: barbican_uri_token_id}
+            $bind_allow_notify: {get_param: bind_allow_notify}
+          template: |
+            #!/bin/sh
+            cd /etc/ansible/roles && git clone https://github.com/skylost/ansible-bind.git bind
+            cd /etc/ansible
+            echo "bind_tsig: $(curl -g -k -s -X GET $barbican_uri_bind_tsig/payload -H "X-Auth-Token: $barbican_uri_token_id")" >> /etc/ansible/host_vars/localhost.yml
+            echo "bind_allow_hosts: $bind_allow_notify" >> /etc/ansible/host_vars/localhost.yml
+            cat <<EOF > /etc/ansible/bind.yml
+            - name: bind | node configure
+              hosts: localhost
+              roles:
+                - bind
+              tasks:
+                - include: roles/bind/tasks/monasca-agent.yml
+            EOF
+            ansible-playbook bind.yml
+
+outputs:
+  OS::stack_id:
+    description: The ID of the role_bind resource.
+    value: {get_resource: role_bind}

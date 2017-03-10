@@ -1,0 +1,18 @@
+heat_template_version: 2016-04-08
+
+description: SoftwareConfig to deploy ansible
+
+resources:
+  deploy_ansible:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: git
+      config: |
+        #!/bin/sh
+        cd /opt && git clone https://github.com/skylost/deploy.git -b ansible deploy
+        cd /opt/deploy && /bin/bash bootstrap
+
+outputs:
+  OS::stack_id:
+    description: The ID of the deploy_ansible resource.
+    value: {get_resource: deploy_ansible}

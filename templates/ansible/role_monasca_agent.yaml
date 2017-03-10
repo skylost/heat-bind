@@ -1,0 +1,72 @@
+heat_template_version: 2016-04-08
+
+description: SoftwareConfig to deploy monasca
+
+parameters:
+  virtualenv_url:
+    type: string
+    description: Virtualenv URL
+  keystone_url:
+    type: string
+    description: Keystone URL
+  monasca_agent_user:
+    type: string
+    description: Monasca Agent user
+  monasca_agent_password:
+    type: string
+    description: Monasca Agent password
+    hidden: true
+  monasca_agent_project:
+    type: string
+    description: Monasca Agent project
+  monasca_agent_dimensions:
+    type: string
+    description: Monasca Agent dimensions
+  monasca_api_url:
+    type: string
+    description: Monasca api URL
+
+resources:
+  role_monasca_agent:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      group: monasca-agent
+      config:
+        str_replace:
+          params:
+            $virtualenv_url: {get_param: virtualenv_url}
+            $keystone_url: {get_param: keystone_url}
+            $monasca_agent_user: {get_param: monasca_agent_user}
+            $monasca_agent_password: {get_param: monasca_agent_password}
+            $monasca_agent_project: {get_param: monasca_agent_project}
+            $monasca_agent_dimensions: {get_param: monasca_agent_dimensions}
+            $monasca_api_url: {get_param: monasca_api_url}
+          template: |
+            #!/bin/sh
+            cd /etc/ansible/roles && git clone https://github.com/skylost/ansible-openstackclient openstackclient
+            cd /etc/ansible/roles && git clone https://github.com/skylost/ansible-monasca-agent monasca-agent
+            cd /etc/ansible
+            cat <<EOF > /etc/ansible/host_vars/localhost.yml
+            virtualenv_url: "$virtualenv_url"
+            keystone_url: "$keystone_url"
+            monasca_agent_user: "$monasca_agent_user"
+            monasca_agent_password: "$monasca_agent_password"
+            monasca_agent_project: "$monasca_agent_project"
+            monasca_agent_dimensions: "$monasca_agent_dimensions"
+            monasca_api_url: "$monasca_api_url"
+            system_cacert_file: "/etc/ssl/certs/cloud-init-ca-certs.pem"
+            EOF
+            cat <<EOF > /etc/ansible/monasca-agent.yml
+            - name: monasca-agent | node configure
+              hosts: localhost
+              roles:
+                - monasca-agent
+              tasks:
+                - include: roles/monasca-agent/tasks/start.yml
+            EOF
+            ansible-playbook monasca-agent.yml
+
+outputs:
+  OS::stack_id:
+    description: The ID of the role_monasca_agent resource.
+    value: {get_resource: role_monasca_agent}

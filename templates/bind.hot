@@ -1,0 +1,220 @@
+heat_template_version: 2016-04-08
+
+description: HOT template to deploy servers bind for designate
+
+parameters:
+  key_name:
+    type: string
+    description: Name of keypair to assign to servers
+  image:
+    type: string
+    description: Name of image to use for servers
+  flavor:
+    type: string
+    description: Flavor to use for servers
+  net_id:
+    type: string
+    description: ID of Neutron network
+  subnet_id:
+    type: string
+    description: ID of Neutron sub network
+  fixed_ip_1:
+    type: string
+    description: IP fixed bind-01
+  fixed_ip_2:
+    type: string
+    description: IP fixed bind-02
+  fixed_ip_3:
+    type: string
+    description: IP fixed bind-03
+  remote_ip_prefix:
+    type: string
+    description: Remote network prefix
+  bind_allow_notify:
+    type: string
+    description: Hosts allow notify
+  virtualenv_url:
+    type: string
+    description: Virtualenv URL
+  keystone_url:
+    type: string
+    description: Keystone URL
+  monasca_agent_user:
+    type: string
+    description: Monasca Agent user
+  monasca_agent_password:
+    type: string
+    description: Monasca Agent password
+    hidden: true
+  monasca_agent_project:
+    type: string
+    description: Monasca Agent project
+  monasca_agent_dimensions:
+    type: string
+    description: Monasca Agent dimensions
+  monasca_api_url:
+    type: string
+    description: Monasca api URL
+  barbican_uri_token_id:
+    type: string
+    description: Barbican URI token id
+    hidden: true
+  barbican_uri_bind_tsig:
+    type: string
+    description: Barbican URI bind tsig
+    hidden: true
+
+resources:
+  bind_group:
+    type: OS::Nova::ServerGroup
+    properties:
+      name: bind_group
+      policies: [ 'anti-affinity' ]
+
+  config_ca:
+    type: cloudconfig/ca.yaml
+
+  config_pkg:
+    type: cloudconfig/pkg.yaml
+
+  ansible:
+    type: ansible/deploy_ansible.yaml
+
+  monasca_agent:
+    type: ansible/role_monasca_agent.yaml
+    properties:
+      virtualenv_url: {get_param: virtualenv_url}
+      keystone_url: {get_param: keystone_url}
+      monasca_agent_user: {get_param: monasca_agent_user}
+      monasca_agent_password: {get_param: monasca_agent_password}
+      monasca_agent_project: {get_param: monasca_agent_project}
+      monasca_agent_dimensions: {get_param: monasca_agent_dimensions}
+      monasca_api_url: {get_param: monasca_api_url}
+
+  bind:
+    type: ansible/role_bind.yaml
+    properties:
+      barbican_uri_bind_tsig: {get_param: barbican_uri_bind_tsig}
+      barbican_uri_token_id: {get_param: barbican_uri_token_id}
+      bind_allow_notify: {get_param: bind_allow_notify}
+
+  server_init:
+    type: OS::Heat::MultipartMime
+    properties:
+      parts:
+      - config: {get_resource: config_ca}
+      - config: {get_resource: config_pkg}
+      - config: {get_resource: ansible}
+      - config: {get_resource: monasca_agent}
+      - config: {get_resource: bind}
+
+  bind-01:
+    type: OS::Nova::Server
+    properties:
+      name: bind-01
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+      networks:
+        - port: { get_resource: bind-01_port }
+      availability_zone: AZ1
+      user_data_format: RAW
+      user_data:
+        get_resource: server_init
+      scheduler_hints:
+        group: { get_resource: bind_group }
+
+  bind-01_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: net_id }
+      fixed_ips:
+        - subnet_id: { get_param: subnet_id }
+          ip_address: { get_param: fixed_ip_1 }
+      security_groups: [{ get_resource: server_security_group }]
+
+  bind-02:
+    type: OS::Nova::Server
+    properties:
+      name: bind-02
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+      networks:
+        - port: { get_resource: bind-02_port }
+      availability_zone: AZ1
+      user_data_format: RAW
+      user_data:
+        get_resource: server_init
+      scheduler_hints:
+        group: { get_resource: bind_group }
+
+  bind-02_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: net_id }
+      fixed_ips:
+        - subnet_id: { get_param: subnet_id }
+          ip_address: { get_param: fixed_ip_2 }
+      security_groups: [{ get_resource: server_security_group }]
+
+  bind-03:
+    type: OS::Nova::Server
+    properties:
+      name: bind-03
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+      networks:
+        - port: { get_resource: bind-03_port }
+      availability_zone: AZ2
+      user_data_format: RAW
+      user_data:
+        get_resource: server_init
+
+  bind-03_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: net_id }
+      fixed_ips:
+        - subnet_id: { get_param: subnet_id }
+          ip_address: { get_param: fixed_ip_3 }
+      security_groups: [{ get_resource: server_security_group }]
+
+  server_security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      description: Bind security group.
+      name: bind-security-group
+      rules: [
+        {remote_ip_prefix: 0.0.0.0/0,
+        protocol: tcp,
+        port_range_min: 22,
+        port_range_max: 22},
+        {remote_ip_prefix: 0.0.0.0/0,
+        protocol: tcp,
+        port_range_min: 53,
+        port_range_max: 53},
+        {remote_ip_prefix: 0.0.0.0/0,
+        protocol: udp,
+        port_range_min: 53,
+        port_range_max: 53},
+        {remote_ip_prefix: { get_param: remote_ip_prefix },
+        protocol: tcp,
+        port_range_min: 953,
+        port_range_max: 953},
+        {remote_ip_prefix: 0.0.0.0/0,
+        protocol: icmp}]
+
+outputs:
+  bind-01_provider_ip:
+    description: IP address of bind-01 in provider network
+    value: { get_attr: [ bind-01, first_address ] }
+
+  bind-02_provider_ip:
+    description: IP address of bind-02 in provider network
+    value: { get_attr: [ bind-02, first_address ] }
+
+  bind-03_provider_ip:
+    description: IP address of bind-03 in provider network
+    value: { get_attr: [ bind-03, first_address ] }

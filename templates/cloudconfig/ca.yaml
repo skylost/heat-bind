@@ -1,0 +1,21 @@
+heat_template_version: 2016-04-08
+
+description: Cloudconfig to deploy ca-certificates
+
+resources:
+  cloudconfig_ca:
+    type: OS::Heat::CloudConfig
+    properties:
+      cloud_config:
+        ca-certs:
+          trusted:
+          - |
+           -----BEGIN CERTIFICATE-----
+           NWMyIFkyE+dlfcGYsqAAjNTA8k3h5uJeqLIWJmPdiQ+6kDLfPvl8iRFsUUuNa3ip
+           9ud8JMaCHv5JiZCCrKoYzB8L3rO9
+           -----END CERTIFICATE-----
+
+outputs:
+  OS::stack_id:
+    description: The ID of the cloudconfig_ca resource.
+    value: {get_resource: cloudconfig_ca}
