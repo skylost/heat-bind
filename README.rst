@@ -31,9 +31,9 @@ Create environment file (bind.yml) with the following variables:
 
 RUN
 ---
-git clone git@vm-gitlab-01:heat/bind.git && cd templates
-heat --os-tenant-id c755f5c0d81940318edacf8c8552aa3a stack-create -f bind.hot -e bind.yml bind
+git clone https://github.com/skylost/heat-bind.git && cd templates
+heat stack-create -f bind.hot -e bind.yml bind
 
 DELETE
 ------
-heat --os-tenant-id c755f5c0d81940318edacf8c8552aa3a stack-delete bind
+heat stack-delete bind
