@@ -63,6 +63,14 @@ parameters:
     type: string
     description: Barbican URI bind tsig
     hidden: true
+  az1_name:
+    type: string
+    description: Name of the first Availability Zone
+    default: AZ1
+  az2_name:
+    type: string
+    description: Name of the second Availability Zone
+    default: AZ2
 
 resources:
   bind_group:
@@ -117,7 +125,7 @@ resources:
       key_name: { get_param: key_name }
       networks:
         - port: { get_resource: bind-01_port }
-      availability_zone: AZ1
+      availability_zone: { get_param: az1_name }
       user_data_format: RAW
       user_data:
         get_resource: server_init
@@ -142,7 +150,7 @@ resources:
       key_name: { get_param: key_name }
       networks:
         - port: { get_resource: bind-02_port }
-      availability_zone: AZ1
+      availability_zone: { get_param: az2_name }
       user_data_format: RAW
       user_data:
         get_resource: server_init
@@ -167,7 +175,7 @@ resources:
       key_name: { get_param: key_name }
       networks:
         - port: { get_resource: bind-03_port }
-      availability_zone: AZ2
+      availability_zone: { get_param: az2_name }
       user_data_format: RAW
       user_data:
         get_resource: server_init
